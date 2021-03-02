@@ -97,6 +97,8 @@
 #include <tuple>
 #include <utility>
 
+static auto re_comment = llvm::Regex("^\\s*#\\s*(ifdef|endif|define|pragma).*$");
+
 using namespace clang;
 
 enum FloatingRank {
@@ -268,8 +270,13 @@ RawComment *ASTContext::getRawCommentForDeclNoCacheImpl(
 
   // There should be no other declarations or preprocessor directives between
   // comment and declaration.
-  if (Text.find_first_of(";{}#@") != StringRef::npos)
+  if (Text.find_first_of(";{}@") != StringRef::npos)
     return nullptr;
+
+  //auto re = llvm::Regex("^\\s*#\\s*(ifdef|endif|define|pragma).*$");
+  if (re_comment.match(Text)) {
+    return nullptr;
+  }
 
   return CommentBeforeDecl;
 }
