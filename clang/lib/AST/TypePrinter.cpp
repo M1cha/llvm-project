@@ -114,6 +114,7 @@ namespace {
 
     static bool canPrefixQualifiers(const Type *T, bool &NeedARCStrongQualifier);
     void spaceBeforePlaceHolder(raw_ostream &OS);
+    QualType getQualType(Decl *D);
     void printTypeSpec(NamedDecl *D, raw_ostream &OS);
 
     void printBefore(QualType T, raw_ostream &OS);
@@ -356,7 +357,15 @@ void TypePrinter::printAfter(const Type *T, Qualifiers Quals, raw_ostream &OS) {
 }
 
 void TypePrinter::printBuiltinBefore(const BuiltinType *T, raw_ostream &OS) {
+  QualType QT = T->desugar();
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleType(OS, &QT, false);
+  }
   OS << T->getName(Policy);
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleType(OS, &QT, true);
+  }
+
   spaceBeforePlaceHolder(OS);
 }
 
@@ -979,6 +988,24 @@ void TypePrinter::printFunctionNoProtoAfter(const FunctionNoProtoType *T,
   printAfter(T->getReturnType(), OS);
 }
 
+QualType TypePrinter::getQualType(Decl *D) {
+  ASTContext &Context = D->getASTContext();
+
+  if (const TypeDecl *TD = dyn_cast<TypeDecl>(D))
+    return Context.getTypeDeclType(TD);
+  if (const ObjCInterfaceDecl *ID = dyn_cast<ObjCInterfaceDecl>(D))
+    return Context.getObjCInterfaceType(ID);
+  if (const DeclaratorDecl *DD = dyn_cast<DeclaratorDecl>(D))
+    return DD->getType();
+  if (const ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    return VD->getType();
+  if (const ObjCPropertyDecl *PD = dyn_cast<ObjCPropertyDecl>(D))
+    return PD->getType();
+  if (const FunctionTemplateDecl *FTD = dyn_cast<FunctionTemplateDecl>(D))
+    return FTD->getTemplatedDecl()->getType();
+  return QualType();
+}
+
 void TypePrinter::printTypeSpec(NamedDecl *D, raw_ostream &OS) {
 
   // Compute the full nested-name-specifier for this type.
@@ -988,7 +1015,16 @@ void TypePrinter::printTypeSpec(NamedDecl *D, raw_ostream &OS) {
     AppendScope(D->getDeclContext(), OS);
 
   IdentifierInfo *II = D->getIdentifier();
+  QualType T = getQualType(D);
+
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleType(OS, &T, false);
+  }
   OS << II->getName();
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleType(OS, &T, true);
+  }
+
   spaceBeforePlaceHolder(OS);
 }
 
@@ -1227,12 +1263,34 @@ void TypePrinter::printTag(TagDecl *D, raw_ostream &OS) {
   if (!Policy.SuppressScope)
     AppendScope(D->getDeclContext(), OS);
 
-  if (const IdentifierInfo *II = D->getIdentifier())
+  if (const IdentifierInfo *II = D->getIdentifier()) {
+
+    QualType T = D->getASTContext().getTypeDeclType(D);
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(OS, &T, false);
+    }
     OS << II->getName();
-  else if (TypedefNameDecl *Typedef = D->getTypedefNameForAnonDecl()) {
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(OS, &T, true);
+    }
+  } else if (TypedefNameDecl *Typedef = D->getTypedefNameForAnonDecl()) {
     assert(Typedef->getIdentifier() && "Typedef without identifier?");
+
+    QualType T = D->getASTContext().getTypeDeclType(D);
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(OS, &T, false);
+    }
     OS << Typedef->getIdentifier()->getName();
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(OS, &T, true);
+    }
   } else {
+    QualType T = D->getASTContext().getTypeDeclType(D);
+
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(OS, &T, false);
+    }
+
     // Make an unambiguous representation for anonymous types, e.g.
     //   (anonymous enum at /usr/include/string.h:120:9)
     OS << (Policy.MSVCFormatting ? '`' : '(');
@@ -1265,6 +1323,10 @@ void TypePrinter::printTag(TagDecl *D, raw_ostream &OS) {
     }
 
     OS << (Policy.MSVCFormatting ? '\'' : ')');
+
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(OS, &T, true);
+    }
   }
 
   // If this is a class template specialization, print the template

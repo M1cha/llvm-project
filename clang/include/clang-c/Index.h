@@ -4339,6 +4339,19 @@ enum CXPrintingPolicyProperty {
   CXPrintingPolicy_LastProperty = CXPrintingPolicy_FullyQualifiedName
 };
 
+typedef void *CXOutputStream;
+CINDEX_LINKAGE void clang_OutputStream_write(CXOutputStream out, const char *s);
+CINDEX_LINKAGE void clang_OutputStream_writeByte(CXOutputStream out, unsigned char c);
+CINDEX_LINKAGE unsigned long long clang_OutputStream_tell(CXOutputStream out);
+
+struct CXPrintingPolicyCallbacks {
+    void (*handleType)(CXOutputStream, CXType, unsigned, CXClientData);
+    void (*handleDeclRef)(CXOutputStream, CXCursor, unsigned, CXClientData);
+};
+
+CINDEX_LINKAGE CXString clang_getTypeSpellingWithPolicy(CXType CT, CXPrintingPolicy cxPolicy);
+CINDEX_LINKAGE CXPrintingPolicy clang_getTypePrintingPolicy(CXType CT);
+
 /**
  * Get a property value for the given printing policy.
  */
@@ -4353,6 +4366,14 @@ CINDEX_LINKAGE void
 clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
                                  enum CXPrintingPolicyProperty Property,
                                  unsigned Value);
+
+/**
+ * Get a property value for the given printing policy.
+ */
+CINDEX_LINKAGE void
+clang_PrintingPolicy_setCallbacks(CXPrintingPolicy Policy,
+                                  const struct CXPrintingPolicyCallbacks *Callbacks,
+                                  CXClientData client_data);
 
 /**
  * Retrieve the default policy for the cursor.

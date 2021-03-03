@@ -974,7 +974,15 @@ void StmtPrinter::VisitDeclRefExpr(DeclRefExpr *Node) {
     Qualifier->print(OS, Policy);
   if (Node->hasTemplateKeyword())
     OS << "template ";
+
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleDeclRef(OS, Node->getDecl(), false);
+  }
   OS << Node->getNameInfo();
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleDeclRef(OS, Node->getDecl(), true);
+  }
+
   if (Node->hasExplicitTemplateArgs())
     printTemplateArgumentList(OS, Node->template_arguments(), Policy);
 }

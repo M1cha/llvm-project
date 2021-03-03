@@ -528,7 +528,15 @@ void DeclPrinter::VisitEnumDecl(EnumDecl *D) {
 
   prettyPrintAttributes(D);
 
-  Out << ' ' << *D;
+  QualType T = Context.getTypeDeclType(D);
+  Out << ' ';
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleType(Out, &T, false);
+  }
+  Out << *D;
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleType(Out, &T, true);
+  }
 
   if (D->isFixed())
     Out << " : " << D->getIntegerType().stream(Policy);
@@ -547,8 +555,19 @@ void DeclPrinter::VisitRecordDecl(RecordDecl *D) {
 
   prettyPrintAttributes(D);
 
-  if (D->getIdentifier())
-    Out << ' ' << *D;
+  if (D->getIdentifier()) {
+    QualType T = Context.getTypeDeclType(D);
+
+    Out << ' ';
+
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(Out, &T, false);
+    }
+    Out << *D;
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(Out, &T, true);
+    }
+  }
 
   if (D->isCompleteDefinition()) {
     Out << " {\n";
@@ -965,7 +984,17 @@ void DeclPrinter::VisitCXXRecordDecl(CXXRecordDecl *D) {
   prettyPrintAttributes(D);
 
   if (D->getIdentifier()) {
-    Out << ' ' << *D;
+    QualType T = Context.getTypeDeclType(D);
+
+    Out << ' ';
+
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(Out, &T, false);
+    }
+    Out << *D;
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleType(Out, &T, true);
+    }
 
     if (auto S = dyn_cast<ClassTemplateSpecializationDecl>(D)) {
       ArrayRef<TemplateArgument> Args = S->getTemplateArgs().asArray();
