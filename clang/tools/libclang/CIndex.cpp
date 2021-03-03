@@ -15,6 +15,7 @@
 #include "CIndexer.h"
 #include "CLog.h"
 #include "CXCursor.h"
+#include "CXPrintingPolicy.h"
 #include "CXSourceLocation.h"
 #include "CXString.h"
 #include "CXTranslationUnit.h"
@@ -69,6 +70,7 @@ using namespace clang;
 using namespace clang::cxcursor;
 using namespace clang::cxtu;
 using namespace clang::cxindex;
+using namespace clang::cxprintingpolicy;
 
 CXTranslationUnit cxtu::MakeCXTranslationUnit(CIndexer *CIdx,
                                               std::unique_ptr<ASTUnit> AU) {
@@ -4869,15 +4871,25 @@ CXStringSet *clang_Cursor_getObjCManglings(CXCursor C) {
   return cxstring::createSet(Manglings);
 }
 
+void clang_OutputStream_write(CXOutputStream out_, const char *s) {
+  llvm::raw_ostream *out = static_cast<llvm::raw_ostream *>(out_);
+  *out << s;
+}
+
+unsigned long long clang_OutputStream_tell(CXOutputStream out_) {
+  llvm::raw_ostream *out = static_cast<llvm::raw_ostream *>(out_);
+  return out->tell();
+}
+
 CXPrintingPolicy clang_getCursorPrintingPolicy(CXCursor C) {
   if (clang_Cursor_isNull(C))
     return 0;
-  return new PrintingPolicy(getCursorContext(C).getPrintingPolicy());
+  return new InternalPrintingPolicy(getCursorContext(C).getPrintingPolicy());
 }
 
 void clang_PrintingPolicy_dispose(CXPrintingPolicy Policy) {
   if (Policy)
-    delete static_cast<PrintingPolicy *>(Policy);
+    delete static_cast<InternalPrintingPolicy *>(Policy);
 }
 
 unsigned
@@ -4886,7 +4898,8 @@ clang_PrintingPolicy_getProperty(CXPrintingPolicy Policy,
   if (!Policy)
     return 0;
 
-  PrintingPolicy *P = static_cast<PrintingPolicy *>(Policy);
+  InternalPrintingPolicy *IP = static_cast<InternalPrintingPolicy *>(Policy);
+  PrintingPolicy *P = &IP->Policy;
   switch (Property) {
   case CXPrintingPolicy_Indentation:
     return P->Indentation;
@@ -4952,7 +4965,8 @@ void clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
   if (!Policy)
     return;
 
-  PrintingPolicy *P = static_cast<PrintingPolicy *>(Policy);
+  InternalPrintingPolicy *IP = static_cast<InternalPrintingPolicy *>(Policy);
+  PrintingPolicy *P = &IP->Policy;
   switch (Property) {
   case CXPrintingPolicy_Indentation:
     P->Indentation = Value;
@@ -5037,6 +5051,20 @@ void clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
   assert(false && "Invalid CXPrintingPolicyProperty");
 }
 
+CINDEX_LINKAGE void
+clang_PrintingPolicy_setCallbacks(CXPrintingPolicy Policy,
+                                  const struct CXPrintingPolicyCallbacks *Callbacks,
+                                  CXClientData client_data)
+{
+  if (!Policy)
+    return;
+
+  InternalPrintingPolicy *P = static_cast<InternalPrintingPolicy *>(Policy);
+  P->Callbacks = Callbacks;
+  P->client_data = client_data;
+  P->Policy.Callbacks = P;
+}
+
 CXString clang_getCursorPrettyPrinted(CXCursor C, CXPrintingPolicy cxPolicy) {
   if (clang_Cursor_isNull(C))
     return cxstring::createEmpty();
@@ -5048,9 +5076,12 @@ CXString clang_getCursorPrettyPrinted(CXCursor C, CXPrintingPolicy cxPolicy) {
 
     SmallString<128> Str;
     llvm::raw_svector_ostream OS(Str);
-    PrintingPolicy *UserPolicy = static_cast<PrintingPolicy *>(cxPolicy);
+    InternalPrintingPolicy *IP = static_cast<InternalPrintingPolicy *>(cxPolicy);
+    PrintingPolicy *UserPolicy = &IP->Policy;
+    IP->TU = getCursorTU(C);
     D->print(OS, UserPolicy ? *UserPolicy
                             : getCursorContext(C).getPrintingPolicy());
+    IP->TU = nullptr;
 
     return cxstring::createDup(OS.str());
   }

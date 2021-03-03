@@ -12,6 +12,7 @@
 
 #include "CIndexer.h"
 #include "CXCursor.h"
+#include "CXPrintingPolicy.h"
 #include "CXString.h"
 #include "CXTranslationUnit.h"
 #include "CXType.h"
@@ -24,6 +25,7 @@
 #include "clang/Frontend/ASTUnit.h"
 
 using namespace clang;
+using namespace clang::cxprintingpolicy;
 
 static CXTypeKind GetBuiltinTypeKind(const BuiltinType *BT) {
 #define BTCASE(K) case BuiltinType::K: return CXType_##K
@@ -288,7 +290,16 @@ CXType clang_getCursorType(CXCursor C) {
   return MakeCXType(QualType(), TU);
 }
 
-CXString clang_getTypeSpelling(CXType CT) {
+CXPrintingPolicy clang_getTypePrintingPolicy(CXType CT) {
+  QualType T = GetQualType(CT);
+  if (T.isNull())
+    return 0;
+
+  CXTranslationUnit TU = GetTU(CT);
+  return new InternalPrintingPolicy(PrintingPolicy(cxtu::getASTUnit(TU)->getASTContext().getLangOpts()));
+}
+
+CXString clang_getTypeSpellingWithPolicy(CXType CT, CXPrintingPolicy cxPolicy) {
   QualType T = GetQualType(CT);
   if (T.isNull())
     return cxstring::createEmpty();
@@ -296,11 +307,26 @@ CXString clang_getTypeSpelling(CXType CT) {
   CXTranslationUnit TU = GetTU(CT);
   SmallString<64> Str;
   llvm::raw_svector_ostream OS(Str);
-  PrintingPolicy PP(cxtu::getASTUnit(TU)->getASTContext().getLangOpts());
 
-  T.print(OS, PP);
+  PrintingPolicy *UserPolicy = nullptr;
+  InternalPrintingPolicy *IP = static_cast<InternalPrintingPolicy *>(cxPolicy);
+  if (IP) {
+    UserPolicy = &IP->Policy;
+    IP->TU = TU;
+  }
+
+  T.print(OS, UserPolicy ? *UserPolicy
+                         : PrintingPolicy(cxtu::getASTUnit(TU)->getASTContext().getLangOpts()));
+
+  if (IP) {
+    IP->TU = nullptr;
+  }
 
   return cxstring::createDup(OS.str());
+}
+
+CXString clang_getTypeSpelling(CXType CT) {
+ return clang_getTypeSpellingWithPolicy(CT, nullptr);
 }
 
 CXType clang_getTypedefDeclUnderlyingType(CXCursor C) {

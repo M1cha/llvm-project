@@ -21,6 +21,7 @@ namespace clang {
 class LangOptions;
 class SourceManager;
 class Stmt;
+class QualType;
 class TagDecl;
 
 class PrinterHelper {
@@ -38,6 +39,12 @@ public:
   /// Remap a path to a form suitable for printing.
   virtual std::string remapPath(StringRef Path) const {
     return std::string(Path);
+  }
+
+  virtual void beforeType(llvm::raw_ostream &Out, QualType *T) const {
+  }
+
+  virtual void afterType(llvm::raw_ostream &Out, QualType *T) const {
   }
 };
 
