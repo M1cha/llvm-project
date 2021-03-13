@@ -4335,6 +4335,8 @@ enum CXPrintingPolicyProperty {
   CXPrintingPolicy_ConstantsAsWritten,
   CXPrintingPolicy_SuppressImplicitBase,
   CXPrintingPolicy_FullyQualifiedName,
+  CXPrintingPolicy_OmitCode,
+  CXPrintingPolicy_PrintOmittedCodeMarker,
 
   CXPrintingPolicy_LastProperty = CXPrintingPolicy_FullyQualifiedName
 };
@@ -4347,6 +4349,7 @@ CINDEX_LINKAGE unsigned long long clang_OutputStream_tell(CXOutputStream out);
 struct CXPrintingPolicyCallbacks {
     void (*handleType)(CXOutputStream, CXType, unsigned, CXClientData);
     void (*handleDeclRef)(CXOutputStream, CXCursor, unsigned, CXClientData);
+    void (*convertDeclName)(CXOutputStream, const char *, CXClientData);
 };
 
 CINDEX_LINKAGE CXString clang_getTypeSpellingWithPolicy(CXType CT, CXPrintingPolicy cxPolicy);

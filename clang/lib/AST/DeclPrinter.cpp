@@ -277,7 +277,12 @@ void DeclPrinter::printDeclType(QualType T, StringRef DeclName, bool Pack) {
     Pack = true;
     T = PET->getPattern();
   }
-  T.print(Out, Policy, (Pack ? "..." : "") + DeclName, Indentation);
+
+  if (false && Policy.Callbacks) {
+    T.print(Out, Policy, (Pack ? "..." : "") + Policy.Callbacks->convertDeclName(DeclName), Indentation);
+  } else {
+    T.print(Out, Policy, (Pack ? "..." : "") + DeclName, Indentation);
+  }
 }
 
 void DeclPrinter::ProcessDeclGroup(SmallVectorImpl<Decl*>& Decls) {
@@ -505,7 +510,20 @@ void DeclPrinter::VisitTypedefDecl(TypedefDecl *D) {
       Out << "__module_private__ ";
   }
   QualType Ty = D->getTypeSourceInfo()->getType();
-  Ty.print(Out, Policy, D->getName(), Indentation);
+
+  if (Policy.Callbacks) {
+    std::string DeclName;
+    llvm::raw_string_ostream OS(DeclName);
+
+    Policy.Callbacks->handleDeclRef(OS, D, false);
+    OS << D->getName();
+    Policy.Callbacks->handleDeclRef(OS, D, true);
+
+    Ty.print(Out, Policy, DeclName, Indentation);
+  } else {
+    Ty.print(Out, Policy, D->getName(), Indentation);
+  }
+
   prettyPrintAttributes(D);
 }
 
@@ -650,7 +668,14 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
         NS->print(OS, Policy);
       }
     }
+
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleDeclRef(OS, D, false);
+    }
     D->getNameInfo().printName(OS, Policy);
+    if (Policy.Callbacks) {
+      Policy.Callbacks->handleDeclRef(OS, D, true);
+    }
   }
 
   if (GuideDecl)
@@ -740,7 +765,6 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
         FT->getNoexceptExpr()->printPretty(EOut, nullptr, SubPolicy,
                                            Indentation);
         EOut.flush();
-        Proto += EOut.str();
         Proto += ")";
       }
     }
@@ -793,7 +817,10 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
       } else
         Out << ' ';
 
-      if (D->getBody())
+      if (Policy.OmitCode) {
+        if (Policy.PrintOmittedCodeMarker)
+          Out << "{ ... }\n";
+      } else if (D->getBody())
         D->getBody()->printPretty(Out, nullptr, SubPolicy, Indentation);
     } else {
       if (!Policy.TerseOutput && isa<CXXConstructorDecl>(*D))
@@ -1727,7 +1754,13 @@ void DeclPrinter::VisitTemplateTypeParmDecl(const TemplateTypeParmDecl *TTP) {
   else if (!TTP->getName().empty())
     Out << ' ';
 
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleDeclRef(Out, TTP, false);
+  }
   Out << *TTP;
+  if (Policy.Callbacks) {
+    Policy.Callbacks->handleDeclRef(Out, TTP, true);
+  }
 
   if (TTP->hasDefaultArgument()) {
     Out << " = ";

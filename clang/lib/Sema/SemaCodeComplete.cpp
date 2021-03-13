@@ -3827,6 +3827,8 @@ CXCursorKind clang::getCursorKindForDecl(const Decl *D) {
     return CXCursor_VarDecl;
   case Decl::Namespace:
     return CXCursor_Namespace;
+  case Decl::LinkageSpec:
+    return CXCursor_LinkageSpec;
   case Decl::NamespaceAlias:
     return CXCursor_NamespaceAlias;
   case Decl::TemplateTypeParm:

@@ -4958,6 +4958,10 @@ clang_PrintingPolicy_getProperty(CXPrintingPolicy Policy,
     return P->SuppressImplicitBase;
   case CXPrintingPolicy_FullyQualifiedName:
     return P->FullyQualifiedName;
+  case CXPrintingPolicy_OmitCode:
+    return P->OmitCode;
+  case CXPrintingPolicy_PrintOmittedCodeMarker:
+    return P->PrintOmittedCodeMarker;
   }
 
   assert(false && "Invalid CXPrintingPolicyProperty");
@@ -5051,6 +5055,12 @@ void clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
   case CXPrintingPolicy_FullyQualifiedName:
     P->FullyQualifiedName = Value;
     return;
+  case CXPrintingPolicy_OmitCode:
+    P->OmitCode = Value;
+    return;
+  case CXPrintingPolicy_PrintOmittedCodeMarker:
+    P->PrintOmittedCodeMarker = Value;
+    return;
   }
 
   assert(false && "Invalid CXPrintingPolicyProperty");
@@ -5083,9 +5093,11 @@ CXString clang_getCursorPrettyPrinted(CXCursor C, CXPrintingPolicy cxPolicy) {
     llvm::raw_svector_ostream OS(Str);
     InternalPrintingPolicy *IP = static_cast<InternalPrintingPolicy *>(cxPolicy);
     PrintingPolicy *UserPolicy = &IP->Policy;
+    PrintingPolicy Policy = UserPolicy ? *UserPolicy
+                            : getCursorContext(C).getPrintingPolicy();
+
     IP->TU = getCursorTU(C);
-    D->print(OS, UserPolicy ? *UserPolicy
-                            : getCursorContext(C).getPrintingPolicy());
+    D->print(OS, Policy);
     IP->TU = nullptr;
 
     return cxstring::createDup(OS.str());

@@ -10,6 +10,7 @@
 #include "clang-c/Index.h"
 #include "CXType.h"
 #include "clang/AST/PrettyPrinter.h"
+#include "llvm/ADT/SmallString.h"
 
 namespace clang {
 
@@ -33,6 +34,19 @@ struct InternalPrintingPolicy final : public PrintingCallbacks {
       if (TU && Callbacks && Callbacks->handleDeclRef) {
         Callbacks->handleDeclRef(&Out, cxcursor::MakeCXCursor(D, TU), end, client_data);
       }
+    }
+
+    virtual std::string convertDeclName(StringRef DeclName) const override {
+      if (TU && Callbacks && Callbacks->convertDeclName) {
+        SmallString<64> Str;
+        llvm::raw_svector_ostream OS(Str);
+
+        Callbacks->convertDeclName(&OS, DeclName.str().c_str(), client_data);
+
+        return OS.str().str();
+      }
+
+      return std::string(DeclName);
     }
 };
 }} // end namespace clang::cxprintingpolicy
