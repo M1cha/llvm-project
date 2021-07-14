@@ -707,6 +707,8 @@ static bool ShouldBreakBeforeBrace(const FormatStyle &Style,
     return Style.BraceWrapping.AfterUnion;
   if (InitialToken.is(tok::kw_struct))
     return Style.BraceWrapping.AfterStruct;
+  if (InitialToken.is(tok::kw_enum))
+    return Style.BraceWrapping.AfterEnum;
   return false;
 }
 
@@ -2452,6 +2454,8 @@ void UnwrappedLineParser::parseRequires() {
 }
 
 bool UnwrappedLineParser::parseEnum() {
+  const FormatToken &InitialToken = *FormatTok;
+
   // Won't be 'enum' for NS_ENUMs.
   if (FormatTok->Tok.is(tok::kw_enum))
     nextToken();
@@ -2502,7 +2506,7 @@ bool UnwrappedLineParser::parseEnum() {
     return true;
   }
 
-  if (!Style.AllowShortEnumsOnASingleLine)
+  if (!Style.AllowShortEnumsOnASingleLine && ShouldBreakBeforeBrace(Style, InitialToken))
     addUnwrappedLine();
   // Parse enum body.
   nextToken();
